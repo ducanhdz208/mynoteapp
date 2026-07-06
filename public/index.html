@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Premium Notes</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23020617'/><rect x='25' y='20' width='50' height='60' rx='5' fill='%230f172a' stroke='%23e63946' stroke-width='4'/><line x1='35' y1='40' x2='65' y2='40' stroke='%233b82f6' stroke-width='4' stroke-linecap='round'/><line x1='35' y1='55' x2='55' y2='55' stroke='%233b82f6' stroke-width='4' stroke-linecap='round'/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+    
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
@@ -24,7 +25,7 @@
         @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(20px, 40px); } }
         .glass { background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 16px; box-shadow: var(--glass-shadow); }
 
-        /* Login Screen Styles */
+        /* Login Screen */
         .login-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 50; }
         .login-box { padding: 3rem; text-align: center; width: 90%; max-width: 400px; }
         .login-box h1 { margin-bottom: 1.5rem; color: #fff; }
@@ -33,9 +34,9 @@
         .login-box button { width: 100%; padding: 1rem; background: var(--accent-secondary); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: 0.2s; }
         .login-box button:hover { background: #2563eb; }
 
-        /* App Layout Styles */
-        #app-layout { display: flex; height: 100dvh; padding: 1rem; gap: 1rem; }
-        .sidebar { width: 320px; display: flex; flex-direction: column; padding: 1.5rem; }
+        /* Desktop Layout (Default) */
+        #app-layout { display: flex; height: 100dvh; padding: 1rem; gap: 1rem; position: relative; overflow: hidden; }
+        .sidebar { width: 320px; display: flex; flex-direction: column; padding: 1.5rem; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s; }
         .header { margin-bottom: 1.5rem; }
         .header h1 { font-size: 1.5rem; font-weight: 800; color: #fff; }
         .new-btn { background: rgba(230, 57, 70, 0.15); border: 1px solid var(--accent); color: #fff; padding: 0.8rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; width: 100%; margin-bottom: 1.5rem; }
@@ -47,18 +48,27 @@
         .course-item .title { font-weight: 800; color: var(--text-main); margin-bottom: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .course-item .preview-text { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .main-content { flex: 1; display: flex; flex-direction: column; padding: 1.5rem; position: relative; }
+        /* Main Content Area */
+        .main-content { flex: 1; display: flex; flex-direction: column; padding: 1.5rem; position: relative; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         .title-input { width: 100%; background: transparent; border: none; color: #fff; font-size: 2rem; font-weight: 800; outline: none; margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.8rem; }
+        
+        /* Mobile Back Button (Hidden on Desktop) */
+        .mobile-back-btn { display: none; background: transparent; color: var(--accent-secondary); border: none; font-size: 1rem; font-weight: 600; cursor: pointer; margin-bottom: 1rem; padding: 0; text-align: left; }
+        .mobile-back-btn:hover { text-decoration: underline; }
+
         .controls { display: flex; gap: 10px; margin-bottom: 1rem; }
         .btn { padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; border: none; transition: all 0.2s; }
         .btn-edit { background: var(--accent-secondary); color: white; }
         .btn-edit:hover { opacity: 0.8; }
         .btn-delete { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
         .btn-delete:hover { background: #ef4444; color: white; }
+        
         .workspace { display: flex; flex: 1; overflow: hidden; }
         .editor-pane, .preview-pane { flex: 1; border-radius: 12px; padding: 1.5rem; font-size: 1rem; line-height: 1.6; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .editor-pane { background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: var(--text-dark); resize: none; outline: none; }
         .preview-pane { background: rgba(255,255,255,0.02); border: 1px solid transparent; color: var(--text-dark); }
+        
+        /* Markdown Styles */
         .preview-pane h1, .preview-pane h2, .preview-pane h3 { color: #fff; margin-bottom: 1rem; margin-top: 1.5rem; font-weight: 800; }
         .preview-pane h1 { font-size: 2rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; }
         .preview-pane h2 { font-size: 1.5rem; }
@@ -74,14 +84,42 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-        @media (max-width: 900px) { #app-layout { flex-direction: column; padding: 0.5rem; } .sidebar { width: 100%; height: 35dvh; padding: 1rem; } .main-content { height: 65dvh; padding: 1rem; } }
+
+        /* NATIVE MOBILE SLIDE LOGIC */
+        @media (max-width: 900px) {
+            #app-layout { padding: 0; display: block; } /* Remove flex layout on mobile */
+            
+            /* Sidebar takes up the whole screen natively */
+            .sidebar { width: 100%; height: 100dvh; border-radius: 0; border: none; }
+            
+            /* Main Content starts off-screen to the right */
+            .main-content { 
+                position: absolute; top: 0; left: 0; 
+                width: 100%; height: 100dvh; 
+                border-radius: 0; border: none; 
+                background: rgba(2, 6, 23, 0.98); /* Solid dark background to hide the list behind it */
+                transform: translateX(100%); 
+                z-index: 10;
+            }
+
+            /* When a note is opened on mobile, apply these transforms */
+            #app-layout.mobile-note-open .sidebar {
+                transform: translateX(-30%); /* Push the list slightly to the left (parallax effect) */
+                opacity: 0.3;
+            }
+            #app-layout.mobile-note-open .main-content {
+                transform: translateX(0); /* Slide the editor in from the right */
+            }
+
+            .mobile-back-btn { display: block; } /* Show the back button */
+            .empty-state { display: none !important; } /* Never show the 'Select a note' text on mobile */
+        }
     </style>
 </head>
 <body>
     <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
 
     <div id="app">
-        
         <!-- LOGIN SCREEN -->
         <div v-if="!isAuthenticated" class="login-screen">
             <div class="glass login-box">
@@ -92,8 +130,10 @@
             </div>
         </div>
 
-        <!-- APP LAYOUT (Hidden until logged in) -->
-        <div v-else id="app-layout">
+        <!-- APP LAYOUT (Notice the dynamic class :class) -->
+        <div v-else id="app-layout" :class="{ 'mobile-note-open': isMobileNoteOpen }">
+            
+            <!-- MASTER: Sidebar List -->
             <div class="sidebar glass">
                 <div class="header"><h1>My Notes</h1></div>
                 <button class="new-btn" @click="createNewNote">+ Create New Note</button>
@@ -105,23 +145,28 @@
                 </div>
             </div>
 
+            <!-- DETAIL: Editor Window -->
             <div class="main-content glass" v-if="currentNote">
+                <button class="mobile-back-btn" @click="closeMobileNote">← Back to Notes</button>
                 <input class="title-input" v-model="currentNote.title" placeholder="Note Title..." @input="saveNote">
+                
                 <div class="controls">
                     <button class="btn btn-edit" @click="isEditing = !isEditing">{{ isEditing ? '👁️ View Beautiful Version' : '✏️ Edit Markdown' }}</button>
                     <button class="btn btn-delete" @click="deleteNote(currentNote.id)">Delete</button>
                 </div>
+                
                 <div class="workspace">
                     <textarea v-if="isEditing" class="editor-pane" v-model="currentNote.content" placeholder="Type your markdown here..." @input="saveNote"></textarea>
                     <div v-else class="preview-pane" v-html="renderedMarkdown"></div>
                 </div>
             </div>
             
-            <div class="main-content glass" v-else style="align-items: center; justify-content: center; opacity: 0.7;">
+            <!-- Desktop Empty State -->
+            <div class="main-content glass empty-state" v-else style="align-items: center; justify-content: center; opacity: 0.7;">
                 <h2>Select or create a note to start</h2>
             </div>
+            
         </div>
-
     </div>
 
     <script>
@@ -129,24 +174,21 @@
 
         createApp({
             setup() {
-                // Auth State
                 const isAuthenticated = ref(false);
                 const passwordInput = ref('');
                 const savedPassword = localStorage.getItem('app_password') || '';
 
-                // App State
                 const notes = ref([]);
                 const currentNote = ref(null);
                 const isEditing = ref(false);
+                const isMobileNoteOpen = ref(false); // Tracks if the editor has slid over on mobile
                 let saveTimeout = null;
 
-                // Returns the headers including our secret password
                 const getHeaders = () => ({
                     'Content-Type': 'application/json',
                     'x-app-password': savedPassword || passwordInput.value
                 });
 
-                // Try to log in
                 const login = async () => {
                     const res = await fetch('/api/notes', { headers: getHeaders() });
                     if (res.status === 200) {
@@ -180,9 +222,19 @@
                     notes.value.unshift(newNote); 
                     currentNote.value = newNote;
                     isEditing.value = true; 
+                    isMobileNoteOpen.value = true; // Slide over automatically
                 };
 
-                const selectNote = (note) => { currentNote.value = note; isEditing.value = false; };
+                const selectNote = (note) => { 
+                    currentNote.value = note; 
+                    isEditing.value = false; 
+                    isMobileNoteOpen.value = true; // Slide over
+                };
+
+                const closeMobileNote = () => {
+                    isMobileNoteOpen.value = false; // Slide back to list
+                    // We don't nullify currentNote here so desktop doesn't lose it if you resize the window!
+                };
 
                 const saveNote = () => {
                     clearTimeout(saveTimeout);
@@ -200,24 +252,20 @@
                 const deleteNote = async (id) => {
                     if(confirm("Are you sure you want to delete this note?")) {
                         await fetch(`/api/notes/${id}`, { method: 'DELETE', headers: getHeaders() });
+                        closeMobileNote(); // Slide back to list automatically on delete
                         currentNote.value = null; 
                         
-                        // Refresh notes
                         const res = await fetch('/api/notes', { headers: getHeaders() });
                         notes.value = await res.json();
                     }
                 };
 
-                onMounted(() => {
-                    // If we already saved a password from a previous visit, auto-login
-                    if (savedPassword) {
-                        login();
-                    }
-                });
+                onMounted(() => { if (savedPassword) login(); });
 
                 return { 
                     isAuthenticated, passwordInput, login, 
-                    notes, currentNote, isEditing, renderedMarkdown, createNewNote, selectNote, saveNote, deleteNote, getPreviewText 
+                    notes, currentNote, isEditing, isMobileNoteOpen, closeMobileNote, 
+                    renderedMarkdown, createNewNote, selectNote, saveNote, deleteNote, getPreviewText 
                 };
             }
         }).mount('#app');
