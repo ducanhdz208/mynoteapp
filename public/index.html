@@ -4,51 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Premium Notes</title>
-    
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
-
         :root {
-            --bg-color: #020617; 
-            --glass-bg: rgba(15, 23, 42, 0.6); 
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-            --accent: #e63946; 
-            --accent-glow: rgba(230, 57, 70, 0.3);
-            --accent-secondary: #3b82f6; 
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --text-dark: #cbd5e1;
+            --bg-color: #020617; --glass-bg: rgba(15, 23, 42, 0.6); --glass-border: rgba(255, 255, 255, 0.08); --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            --accent: #e63946; --accent-glow: rgba(230, 57, 70, 0.3); --accent-secondary: #3b82f6; 
+            --text-main: #f8fafc; --text-muted: #94a3b8; --text-dark: #cbd5e1;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-
-        /* Fixed Mobile Height using 100dvh */
         body { background-color: var(--bg-color); color: var(--text-main); height: 100dvh; overflow: hidden; position: relative; }
-
-        /* Background Blobs */
         .blob { position: fixed; border-radius: 50%; filter: blur(90px); z-index: -1; opacity: 0.4; animation: float 12s infinite alternate ease-in-out; }
         .blob-1 { top: -10%; left: -10%; width: 40vw; height: 40vw; background: #7f1d1d; } 
         .blob-2 { bottom: -10%; right: -10%; width: 35vw; height: 35vw; background: #1e3a8a; animation-delay: -5s; } 
         .blob-3 { top: 30%; left: 30%; width: 30vw; height: 30vw; background: #0f172a; animation-duration: 15s; }
         @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(20px, 40px); } }
-
         .glass { background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 16px; box-shadow: var(--glass-shadow); }
 
-        #app { display: flex; height: 100dvh; padding: 1rem; gap: 1rem; }
-        
+        /* Login Screen Styles */
+        .login-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 50; }
+        .login-box { padding: 3rem; text-align: center; width: 90%; max-width: 400px; }
+        .login-box h1 { margin-bottom: 1.5rem; color: #fff; }
+        .login-box input { width: 100%; padding: 1rem; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; font-size: 1.1rem; margin-bottom: 1rem; outline: none; text-align: center; }
+        .login-box input:focus { border-color: var(--accent-secondary); }
+        .login-box button { width: 100%; padding: 1rem; background: var(--accent-secondary); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: 0.2s; }
+        .login-box button:hover { background: #2563eb; }
+
+        /* App Layout Styles */
+        #app-layout { display: flex; height: 100dvh; padding: 1rem; gap: 1rem; }
         .sidebar { width: 320px; display: flex; flex-direction: column; padding: 1.5rem; }
         .header { margin-bottom: 1.5rem; }
         .header h1 { font-size: 1.5rem; font-weight: 800; color: #fff; }
-        
         .new-btn { background: rgba(230, 57, 70, 0.15); border: 1px solid var(--accent); color: #fff; padding: 0.8rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; width: 100%; margin-bottom: 1.5rem; }
         .new-btn:hover { background: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
-
         .note-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; padding-right: 0.5rem; -webkit-overflow-scrolling: touch; }
-        
         .course-item { display: flex; flex-direction: column; padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
         .course-item:hover { background: rgba(255,255,255,0.06); border-color: var(--accent-secondary); transform: translateX(4px); }
         .course-item.active { border-color: var(--accent); background: rgba(230, 57, 70, 0.1); }
@@ -56,27 +47,17 @@
         .course-item .preview-text { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 1.5rem; position: relative; }
-        
         .title-input { width: 100%; background: transparent; border: none; color: #fff; font-size: 2rem; font-weight: 800; outline: none; margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.8rem; }
-        
         .controls { display: flex; gap: 10px; margin-bottom: 1rem; }
         .btn { padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; border: none; transition: all 0.2s; }
         .btn-edit { background: var(--accent-secondary); color: white; }
         .btn-edit:hover { opacity: 0.8; }
         .btn-delete { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
         .btn-delete:hover { background: #ef4444; color: white; }
-
         .workspace { display: flex; flex: 1; overflow: hidden; }
-        
-        /* Single Pane Styling */
         .editor-pane, .preview-pane { flex: 1; border-radius: 12px; padding: 1.5rem; font-size: 1rem; line-height: 1.6; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        
         .editor-pane { background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: var(--text-dark); resize: none; outline: none; }
-        .editor-pane:focus { border-color: var(--accent-secondary); }
-
         .preview-pane { background: rgba(255,255,255,0.02); border: 1px solid transparent; color: var(--text-dark); }
-        
-        /* Beautiful Markdown Styling */
         .preview-pane h1, .preview-pane h2, .preview-pane h3 { color: #fff; margin-bottom: 1rem; margin-top: 1.5rem; font-weight: 800; }
         .preview-pane h1 { font-size: 2rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; }
         .preview-pane h2 { font-size: 1.5rem; }
@@ -92,56 +73,52 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-
-        @media (max-width: 900px) {
-            #app { flex-direction: column; padding: 0.5rem; }
-            .sidebar { width: 100%; height: 35dvh; padding: 1rem; }
-            .main-content { height: 65dvh; padding: 1rem; }
-        }
+        @media (max-width: 900px) { #app-layout { flex-direction: column; padding: 0.5rem; } .sidebar { width: 100%; height: 35dvh; padding: 1rem; } .main-content { height: 65dvh; padding: 1rem; } }
     </style>
 </head>
 <body>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
+    <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
 
     <div id="app">
         
-        <div class="sidebar glass">
-            <div class="header">
-                <h1>My Notes</h1>
-            </div>
-            <button class="new-btn" @click="createNewNote">+ Create New Note</button>
-            <div class="note-list">
-                <div v-for="note in notes" :key="note.id" class="course-item" :class="{ active: currentNote && currentNote.id === note.id }" @click="selectNote(note)">
-                    <div class="title">{{ note.title || 'Untitled Note' }}</div>
-                    <div class="preview-text">{{ getPreviewText(note.content) }}</div>
-                </div>
+        <!-- LOGIN SCREEN -->
+        <div v-if="!isAuthenticated" class="login-screen">
+            <div class="glass login-box">
+                <h1>🔒 Secure Notes</h1>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Enter your master password.</p>
+                <input type="password" v-model="passwordInput" placeholder="Password" @keyup.enter="login">
+                <button @click="login">Unlock</button>
             </div>
         </div>
 
-        <div class="main-content glass" v-if="currentNote">
-            <input class="title-input" v-model="currentNote.title" placeholder="Note Title..." @input="saveNote">
-            
-            <div class="controls">
-                <!-- Toggle Button for Edit/View -->
-                <button class="btn btn-edit" @click="isEditing = !isEditing">
-                    {{ isEditing ? '👁️ View Beautiful Version' : '✏️ Edit Markdown' }}
-                </button>
-                <button class="btn btn-delete" @click="deleteNote(currentNote.id)">Delete</button>
+        <!-- APP LAYOUT (Hidden until logged in) -->
+        <div v-else id="app-layout">
+            <div class="sidebar glass">
+                <div class="header"><h1>My Notes</h1></div>
+                <button class="new-btn" @click="createNewNote">+ Create New Note</button>
+                <div class="note-list">
+                    <div v-for="note in notes" :key="note.id" class="course-item" :class="{ active: currentNote && currentNote.id === note.id }" @click="selectNote(note)">
+                        <div class="title">{{ note.title || 'Untitled Note' }}</div>
+                        <div class="preview-text">{{ getPreviewText(note.content) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-content glass" v-if="currentNote">
+                <input class="title-input" v-model="currentNote.title" placeholder="Note Title..." @input="saveNote">
+                <div class="controls">
+                    <button class="btn btn-edit" @click="isEditing = !isEditing">{{ isEditing ? '👁️ View Beautiful Version' : '✏️ Edit Markdown' }}</button>
+                    <button class="btn btn-delete" @click="deleteNote(currentNote.id)">Delete</button>
+                </div>
+                <div class="workspace">
+                    <textarea v-if="isEditing" class="editor-pane" v-model="currentNote.content" placeholder="Type your markdown here..." @input="saveNote"></textarea>
+                    <div v-else class="preview-pane" v-html="renderedMarkdown"></div>
+                </div>
             </div>
             
-            <div class="workspace">
-                <!-- Shows only when Editing -->
-                <textarea v-if="isEditing" class="editor-pane" v-model="currentNote.content" placeholder="Type your markdown here..." @input="saveNote"></textarea>
-                
-                <!-- Shows only when Viewing -->
-                <div v-else class="preview-pane" v-html="renderedMarkdown"></div>
+            <div class="main-content glass" v-else style="align-items: center; justify-content: center; opacity: 0.7;">
+                <h2>Select or create a note to start</h2>
             </div>
-        </div>
-        
-        <div class="main-content glass" v-else style="align-items: center; justify-content: center; opacity: 0.7;">
-            <h2>Select or create a note to start</h2>
         </div>
 
     </div>
@@ -151,10 +128,36 @@
 
         createApp({
             setup() {
+                // Auth State
+                const isAuthenticated = ref(false);
+                const passwordInput = ref('');
+                const savedPassword = localStorage.getItem('app_password') || '';
+
+                // App State
                 const notes = ref([]);
                 const currentNote = ref(null);
-                const isEditing = ref(false); // New state to track if we are editing
+                const isEditing = ref(false);
                 let saveTimeout = null;
+
+                // Returns the headers including our secret password
+                const getHeaders = () => ({
+                    'Content-Type': 'application/json',
+                    'x-app-password': savedPassword || passwordInput.value
+                });
+
+                // Try to log in
+                const login = async () => {
+                    const res = await fetch('/api/notes', { headers: getHeaders() });
+                    if (res.status === 200) {
+                        isAuthenticated.value = true;
+                        localStorage.setItem('app_password', passwordInput.value || savedPassword);
+                        notes.value = await res.json();
+                    } else {
+                        alert('Incorrect password!');
+                        passwordInput.value = '';
+                        localStorage.removeItem('app_password');
+                    }
+                };
 
                 const renderedMarkdown = computed(() => {
                     if (!currentNote.value || !currentNote.value.content) return '<em>Start typing...</em>';
@@ -166,34 +169,26 @@
                     return content.replace(/[#*`_>]/g, '').substring(0, 40) + '...';
                 };
 
-                const fetchNotes = async () => {
-                    const res = await fetch('/api/notes');
-                    notes.value = await res.json();
-                };
-
                 const createNewNote = async () => {
                     const res = await fetch('/api/notes', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getHeaders(),
                         body: JSON.stringify({ title: 'New Note', content: '' })
                     });
                     const newNote = await res.json();
                     notes.value.unshift(newNote); 
                     currentNote.value = newNote;
-                    isEditing.value = true; // Auto-open edit mode for new notes
+                    isEditing.value = true; 
                 };
 
-                const selectNote = (note) => {
-                    currentNote.value = note;
-                    isEditing.value = false; // Always default to reading mode when clicking a note
-                };
+                const selectNote = (note) => { currentNote.value = note; isEditing.value = false; };
 
                 const saveNote = () => {
                     clearTimeout(saveTimeout);
                     saveTimeout = setTimeout(async () => {
                         await fetch(`/api/notes/${currentNote.value.id}`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: getHeaders(),
                             body: JSON.stringify(currentNote.value)
                         });
                         const index = notes.value.findIndex(n => n.id === currentNote.value.id);
@@ -203,15 +198,26 @@
 
                 const deleteNote = async (id) => {
                     if(confirm("Are you sure you want to delete this note?")) {
-                        await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+                        await fetch(`/api/notes/${id}`, { method: 'DELETE', headers: getHeaders() });
                         currentNote.value = null; 
-                        fetchNotes(); 
+                        
+                        // Refresh notes
+                        const res = await fetch('/api/notes', { headers: getHeaders() });
+                        notes.value = await res.json();
                     }
                 };
 
-                onMounted(fetchNotes);
+                onMounted(() => {
+                    // If we already saved a password from a previous visit, auto-login
+                    if (savedPassword) {
+                        login();
+                    }
+                });
 
-                return { notes, currentNote, isEditing, renderedMarkdown, createNewNote, selectNote, saveNote, deleteNote, getPreviewText };
+                return { 
+                    isAuthenticated, passwordInput, login, 
+                    notes, currentNote, isEditing, renderedMarkdown, createNewNote, selectNote, saveNote, deleteNote, getPreviewText 
+                };
             }
         }).mount('#app');
     </script>
