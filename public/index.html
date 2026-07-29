@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Notes — Private Writing Space</title>
-    <meta name="theme-color" content="#050505">
+    <meta name="theme-color" content="#07080a">
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -66,7 +66,12 @@
                             <h1>My Notes</h1>
                         </div>
                     </div>
-                    <button class="icon-btn lock-btn" title="Lock app" aria-label="Lock app" @click="logout">◌</button>
+                    <button class="icon-btn lock-btn" title="Lock app" aria-label="Lock app" @click="logout">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="5" y="11" width="14" height="9" rx="2.5"></rect>
+                            <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
+                        </svg>
+                    </button>
                 </div>
 
                 <div v-if="isOffline" class="offline-banner">
@@ -74,11 +79,17 @@
                 </div>
 
                 <button class="new-btn" @click="createNewNote">
-                    <span aria-hidden="true">＋</span> New note
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14"></path>
+                    </svg>
+                    New note
                 </button>
 
                 <div class="search-wrap">
-                    <span aria-hidden="true">⌕</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="6.5"></circle>
+                        <path d="m20 20-3.6-3.6"></path>
+                    </svg>
                     <input
                         ref="searchInput"
                         v-model="searchQuery"
@@ -101,6 +112,7 @@
                         :class="{ active: favoritesOnly }"
                         title="Show favorites only"
                         aria-label="Show favorites only"
+                        :aria-pressed="favoritesOnly"
                         @click="favoritesOnly = !favoritesOnly"
                     >
                         ★
@@ -129,7 +141,11 @@
                         :key="note.id"
                         class="course-item"
                         :class="{ active: currentNote && currentNote.id === note.id }"
+                        role="button"
+                        tabindex="0"
                         @click="selectNote(note)"
+                        @keydown.enter.prevent="selectNote(note)"
+                        @keydown.space.prevent="selectNote(note)"
                     >
                         <div class="note-card-heading">
                             <div class="title">{{ note.title || 'Untitled Note' }}</div>
@@ -138,14 +154,21 @@
                                     :class="{ active: note.pinned }"
                                     title="Pin note"
                                     aria-label="Pin note"
+                                    :aria-pressed="note.pinned"
                                     @click.stop="toggleNoteFlag(note, 'pinned')"
-                                >⌖</button>
+                                >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 17v5"></path>
+                                        <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1Z"></path>
+                                    </svg>
+                                </button>
                                 <button
                                     :class="{ active: note.favorite }"
                                     title="Favorite note"
                                     aria-label="Favorite note"
+                                    :aria-pressed="note.favorite"
                                     @click.stop="toggleNoteFlag(note, 'favorite')"
-                                >★</button>
+                                >{{ note.favorite ? '★' : '☆' }}</button>
                             </div>
                         </div>
                         <div class="preview-text">{{ getPreviewText(note.content) }}</div>
@@ -293,7 +316,7 @@
             </section>
         </div>
 
-        <div v-if="toastMessage" class="toast">{{ toastMessage }}</div>
+        <div v-if="toastMessage" class="toast" role="status" aria-live="polite">{{ toastMessage }}</div>
     </div>
 </body>
 </html>

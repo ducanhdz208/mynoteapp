@@ -1,4 +1,4 @@
-const CACHE_NAME = 'personal-notes-shell-v4';
+const CACHE_NAME = 'personal-notes-shell-v5';
 const APP_SHELL = [
     '/',
     '/index.html',
@@ -49,6 +49,23 @@ self.addEventListener('fetch', (event) => {
                     return response;
                 })
                 .catch(() => caches.match('/index.html'))
+        );
+        return;
+    }
+
+    // Same-origin shell assets: network-first so UI updates reach users
+    // immediately, falling back to the cache when offline.
+    if (url.origin === self.location.origin) {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    if (response.ok) {
+                        const copy = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(request))
         );
         return;
     }
