@@ -75,12 +75,14 @@
                 </div>
 
                 <div class="filter-row">
-                    <select v-model="folderFilter" aria-label="Filter by folder">
-                        <option value="">All folders</option>
-                        <option v-for="folder in folders" :key="folder" :value="folder">
-                            {{ folder }}
-                        </option>
-                    </select>
+                    <div class="folder-select">
+                        <select v-model="folderFilter" aria-label="Filter by folder">
+                            <option value="">All folders</option>
+                            <option v-for="folder in folders" :key="folder" :value="folder">
+                                {{ folder }}
+                            </option>
+                        </select>
+                    </div>
                     <button
                         class="filter-toggle"
                         :class="{ active: favoritesOnly }"

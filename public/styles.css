@@ -270,11 +270,11 @@ body {
 
 .filter-row {
     display: flex;
+    align-items: stretch;
     gap: 0.5rem;
     margin-bottom: 0.75rem;
 }
 
-.filter-row select,
 .note-properties input {
     min-width: 0;
     border: 1px solid var(--glass-border);
@@ -284,9 +284,47 @@ body {
     color: var(--text-main);
 }
 
-.filter-row select {
+.folder-select {
+    position: relative;
     flex: 1;
-    padding: 0.55rem 0.65rem;
+    min-width: 0;
+}
+
+.folder-select::after {
+    content: '▾';
+    position: absolute;
+    top: 50%;
+    right: 0.8rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.folder-select select {
+    width: 100%;
+    height: 100%;
+    min-height: 38px;
+    padding: 0.55rem 2.25rem 0.55rem 0.8rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 7px;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text-main);
+    line-height: 1.25;
+    cursor: pointer;
+}
+
+.folder-select select:focus {
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.folder-select select option {
+    background: #0f172a;
+    color: var(--text-main);
 }
 
 .filter-toggle {
