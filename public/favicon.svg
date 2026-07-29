@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="tileBg" cx="28%" cy="18%" r="90%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="38%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="planeFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+    <radialGradient id="orbFill" cx="38%" cy="32%" r="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d8d8dc"/>
+    </radialGradient>
+  </defs>
+
+  <!-- glass tile -->
+  <rect x="1" y="1" width="62" height="62" rx="20" fill="#0b0c0e"/>
+  <rect x="1" y="1" width="62" height="62" rx="20" fill="url(#tileBg)"/>
+  <rect x="1" y="1" width="62" height="62" rx="20" fill="none" stroke="#ffffff" stroke-opacity="0.24" stroke-width="1.5"/>
+  <!-- top inner highlight -->
+  <rect x="2.5" y="2.5" width="59" height="30" rx="17" fill="#ffffff" fill-opacity="0.06"/>
+
+  <!-- back plane -->
+  <g transform="rotate(-13 27.5 29.4)">
+    <rect x="10.9" y="12.8" width="33.2" height="33.2" rx="11.3"
+          fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.27" stroke-width="1.2"/>
+  </g>
+
+  <!-- front plane -->
+  <g transform="rotate(11 37.2 36.5)">
+    <rect x="20.6" y="19.9" width="33.2" height="33.2" rx="11.3"
+          fill="url(#planeFill)" stroke="#ffffff" stroke-opacity="0.27" stroke-width="1.2"/>
+  </g>
+
+  <!-- orb -->
+  <circle cx="44.5" cy="18.2" r="6.1" fill="url(#orbFill)" fill-opacity="0.92"
+          stroke="#ffffff" stroke-opacity="0.5" stroke-width="1"/>
+</svg>

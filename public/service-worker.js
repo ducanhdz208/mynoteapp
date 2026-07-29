@@ -1,9 +1,12 @@
-const CACHE_NAME = 'personal-notes-shell-v6';
+const CACHE_NAME = 'personal-notes-shell-v7';
 const APP_SHELL = [
     '/',
     '/index.html',
     '/styles.css',
     '/app.js',
+    '/favicon.svg',
+    '/favicon.png',
+    '/apple-touch-icon.png',
     'https://unpkg.com/vue@3/dist/vue.global.js',
     'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
     'https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js'
