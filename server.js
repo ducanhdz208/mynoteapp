@@ -1,62 +1,342 @@
+const crypto = require('crypto');
 const express = require('express');
 const { sql } = require('@vercel/postgres');
 const path = require('path');
+
 const app = express();
+const SESSION_COOKIE = 'notes_session';
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
+const loginAttempts = new Map();
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
-// --- SECURITY CHECKPOINT ---
-const requireAuth = (req, res, next) => {
-  // Grab the password sent by the frontend
-  const providedPass = req.headers['x-app-password'];
-  // Grab the real password from Vercel (or default to 'admin' if testing locally)
-  const actualPass = process.env.APP_PASSWORD || 'admin';
+const getPassword = () => process.env.APP_PASSWORD || 'admin';
 
-  if (providedPass === actualPass) {
-    next(); // Password matches, let them in!
-  } else {
-    res.status(401).json({ error: 'Unauthorized: Wrong password' }); // Kick them out
-  }
+const safeEqual = (left, right) => {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  return leftBuffer.length === rightBuffer.length
+    && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 };
+
+const signSession = (timestamp) => crypto
+  .createHmac('sha256', getPassword())
+  .update(timestamp)
+  .digest('base64url');
+
+const createSessionToken = () => {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  return `${timestamp}.${signSession(timestamp)}`;
+};
+
+const parseCookies = (cookieHeader = '') => Object.fromEntries(
+  cookieHeader
+    .split(';')
+    .map((part) => part.trim().split('='))
+    .filter(([key, value]) => key && value)
+    .map(([key, value]) => [key, decodeURIComponent(value)])
+);
+
+const isValidSession = (token = '') => {
+  const [timestamp, signature] = token.split('.');
+  if (!timestamp || !signature || !safeEqual(signature, signSession(timestamp))) {
+    return false;
+  }
+
+  const age = Math.floor(Date.now() / 1000) - Number(timestamp);
+  return Number.isFinite(age) && age >= 0 && age <= SESSION_MAX_AGE;
+};
+
+const sessionCookieOptions = (req) => ({
+  httpOnly: true,
+  sameSite: 'strict',
+  secure: req.secure || req.get('x-forwarded-proto') === 'https',
+  maxAge: SESSION_MAX_AGE * 1000,
+  path: '/'
+});
+
+const requireAuth = (req, res, next) => {
+  const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+  if (isValidSession(token)) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Authentication required' });
+};
+
+const asyncRoute = (handler) => (req, res, next) => {
+  Promise.resolve(handler(req, res, next)).catch(next);
+};
+
+const normalizeTags = (tags) => {
+  const values = Array.isArray(tags) ? tags : String(tags || '').split(',');
+  return [...new Set(values.map((tag) => String(tag).trim()).filter(Boolean))].slice(0, 20);
+};
+
+const normalizeNote = (body = {}) => ({
+  title: String(body.title || 'Untitled Note').slice(0, 300),
+  content: String(body.content || ''),
+  folder: String(body.folder || 'Notes').trim().slice(0, 100) || 'Notes',
+  tags: normalizeTags(body.tags),
+  pinned: Boolean(body.pinned),
+  favorite: Boolean(body.favorite)
+});
 
 async function initDB() {
   try {
-    await sql`CREATE TABLE IF NOT EXISTS notes (id SERIAL PRIMARY KEY, title TEXT, content TEXT);`;
-  } catch (error) { console.error("DB Init failed:", error); }
+    await sql`
+      CREATE TABLE IF NOT EXISTS notes (
+        id SERIAL PRIMARY KEY,
+        title TEXT,
+        content TEXT
+      )
+    `;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT 'Notes'`;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'`;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS note_versions (
+        id SERIAL PRIMARY KEY,
+        note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        title TEXT,
+        content TEXT,
+        folder TEXT,
+        tags TEXT[],
+        pinned BOOLEAN,
+        favorite BOOLEAN,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+  } catch (error) {
+    console.error('DB initialization failed:', error);
+  }
 }
+
 initDB();
 
-// Notice we added `requireAuth` to all of these routes!
-// GET: Fetch all notes
-app.get('/api/notes', requireAuth, async (req, res) => {
-  const { rows } = await sql`SELECT * FROM notes ORDER BY id DESC`;
+app.post('/api/login', asyncRoute(async (req, res) => {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip) || { count: 0, resetAt: now + 15 * 60 * 1000 };
+
+  if (now > attempt.resetAt) {
+    attempt.count = 0;
+    attempt.resetAt = now + 15 * 60 * 1000;
+  }
+  if (attempt.count >= 10) {
+    return res.status(429).json({ error: 'Too many login attempts. Try again later.' });
+  }
+
+  if (!safeEqual(req.body.password || '', getPassword())) {
+    attempt.count += 1;
+    loginAttempts.set(ip, attempt);
+    return res.status(401).json({ error: 'Incorrect password' });
+  }
+
+  loginAttempts.delete(ip);
+  res.cookie(SESSION_COOKIE, createSessionToken(), sessionCookieOptions(req));
+  return res.json({ authenticated: true });
+}));
+
+app.get('/api/session', (req, res) => {
+  const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+  res.json({ authenticated: isValidSession(token) });
+});
+
+app.post('/api/logout', (req, res) => {
+  res.clearCookie(SESSION_COOKIE, { ...sessionCookieOptions(req), maxAge: 0 });
+  res.json({ authenticated: false });
+});
+
+app.get('/api/notes', requireAuth, asyncRoute(async (req, res) => {
+  const { rows } = await sql`
+    SELECT id, title, content, folder, tags, pinned, favorite, updated_at
+    FROM notes
+    ORDER BY pinned DESC, updated_at DESC, id DESC
+  `;
   res.json(rows);
-});
+}));
 
-// POST: Create a new note
-app.post('/api/notes', requireAuth, async (req, res) => {
-  const { title, content } = req.body;
-  const { rows } = await sql`INSERT INTO notes (title, content) VALUES (${title}, ${content}) RETURNING *`;
-  res.json(rows[0]);
-});
+app.post('/api/notes', requireAuth, asyncRoute(async (req, res) => {
+  const note = normalizeNote(req.body);
+  const { rows } = await sql`
+    INSERT INTO notes (title, content, folder, tags, pinned, favorite, updated_at)
+    VALUES (
+      ${note.title},
+      ${note.content},
+      ${note.folder},
+      ${note.tags},
+      ${note.pinned},
+      ${note.favorite},
+      NOW()
+    )
+    RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+  `;
+  res.status(201).json(rows[0]);
+}));
 
-// PUT: Update a note
-app.put('/api/notes/:id', requireAuth, async (req, res) => {
-  const { title, content } = req.body;
-  const { id } = req.params;
-  await sql`UPDATE notes SET title = ${title}, content = ${content} WHERE id = ${id}`;
-  res.json({ updated: true });
-});
+app.put('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
+  const note = normalizeNote(req.body);
+  const { rows: existingRows } = await sql`
+    SELECT id, title, content, folder, tags, pinned, favorite
+    FROM notes
+    WHERE id = ${req.params.id}
+  `;
+  const existing = existingRows[0];
+  if (!existing) {
+    return res.status(404).json({ error: 'Note not found' });
+  }
 
-// DELETE: Delete a note
-app.delete('/api/notes/:id', requireAuth, async (req, res) => {
-  const { id } = req.params;
-  await sql`DELETE FROM notes WHERE id = ${id}`;
-  res.json({ deleted: true });
+  const changed = existing.title !== note.title
+    || existing.content !== note.content
+    || existing.folder !== note.folder
+    || JSON.stringify(existing.tags || []) !== JSON.stringify(note.tags)
+    || existing.pinned !== note.pinned
+    || existing.favorite !== note.favorite;
+
+  if (changed) {
+    await sql`
+      INSERT INTO note_versions (
+        note_id, title, content, folder, tags, pinned, favorite
+      )
+      VALUES (
+        ${existing.id},
+        ${existing.title},
+        ${existing.content},
+        ${existing.folder},
+        ${existing.tags || []},
+        ${existing.pinned},
+        ${existing.favorite}
+      )
+    `;
+  }
+
+  const { rows } = await sql`
+    UPDATE notes
+    SET
+      title = ${note.title},
+      content = ${note.content},
+      folder = ${note.folder},
+      tags = ${note.tags},
+      pinned = ${note.pinned},
+      favorite = ${note.favorite},
+      updated_at = NOW()
+    WHERE id = ${req.params.id}
+    RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+  `;
+  return res.json(rows[0]);
+}));
+
+app.delete('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
+  const { rowCount } = await sql`DELETE FROM notes WHERE id = ${req.params.id}`;
+  if (!rowCount) {
+    return res.status(404).json({ error: 'Note not found' });
+  }
+  return res.json({ deleted: true });
+}));
+
+app.get('/api/notes/:id/history', requireAuth, asyncRoute(async (req, res) => {
+  const { rows } = await sql`
+    SELECT id, note_id, title, content, folder, tags, pinned, favorite, created_at
+    FROM note_versions
+    WHERE note_id = ${req.params.id}
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  res.json(rows);
+}));
+
+app.post('/api/notes/:id/history/:versionId/restore', requireAuth, asyncRoute(async (req, res) => {
+  const { rows } = await sql`
+    SELECT title, content, folder, tags, pinned, favorite
+    FROM note_versions
+    WHERE id = ${req.params.versionId} AND note_id = ${req.params.id}
+  `;
+  if (!rows[0]) {
+    return res.status(404).json({ error: 'Version not found' });
+  }
+
+  const current = await sql`
+    SELECT title, content, folder, tags, pinned, favorite
+    FROM notes
+    WHERE id = ${req.params.id}
+  `;
+  if (!current.rows[0]) {
+    return res.status(404).json({ error: 'Note not found' });
+  }
+
+  const old = current.rows[0];
+  await sql`
+    INSERT INTO note_versions (note_id, title, content, folder, tags, pinned, favorite)
+    VALUES (
+      ${req.params.id},
+      ${old.title},
+      ${old.content},
+      ${old.folder},
+      ${old.tags || []},
+      ${old.pinned},
+      ${old.favorite}
+    )
+  `;
+
+  const version = rows[0];
+  const restored = await sql`
+    UPDATE notes
+    SET
+      title = ${version.title},
+      content = ${version.content},
+      folder = ${version.folder},
+      tags = ${version.tags || []},
+      pinned = ${version.pinned},
+      favorite = ${version.favorite},
+      updated_at = NOW()
+    WHERE id = ${req.params.id}
+    RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+  `;
+  return res.json(restored.rows[0]);
+}));
+
+app.post('/api/import', requireAuth, asyncRoute(async (req, res) => {
+  const importedNotes = Array.isArray(req.body.notes) ? req.body.notes.slice(0, 500) : [];
+  if (!importedNotes.length) {
+    return res.status(400).json({ error: 'No notes supplied' });
+  }
+
+  const created = [];
+  for (const input of importedNotes) {
+    const note = normalizeNote(input);
+    const { rows } = await sql`
+      INSERT INTO notes (title, content, folder, tags, pinned, favorite, updated_at)
+      VALUES (
+        ${note.title},
+        ${note.content},
+        ${note.folder},
+        ${note.tags},
+        ${note.pinned},
+        ${note.favorite},
+        NOW()
+      )
+      RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+    `;
+    created.push(rows[0]);
+  }
+  return res.status(201).json({ imported: created.length, notes: created });
+}));
+
+app.use('/api', (error, req, res, next) => {
+  console.error(error);
+  if (res.headersSent) return next(error);
+  return res.status(500).json({ error: 'Unexpected server error' });
 });
 
 if (require.main === module) {
-  app.listen(3000, '0.0.0.0', () => console.log('✅ Local server running!'));
+  app.listen(3000, '0.0.0.0', () => console.log('✅ Local server running on port 3000'));
 }
+
 module.exports = app;

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
     <script src="app.js" defer></script>
 </head>
 <body>
@@ -15,8 +16,7 @@
     <div class="blob blob-2"></div>
     <div class="blob blob-3"></div>
 
-    <div id="app">
-        <!-- Login screen -->
+    <div id="app" v-cloak>
         <div v-if="!isAuthenticated" class="login-screen">
             <div class="glass login-box">
                 <h1>🔒 Secure Notes</h1>
@@ -25,49 +25,142 @@
                     type="password"
                     v-model="passwordInput"
                     placeholder="Password"
+                    autocomplete="current-password"
                     @keyup.enter="login"
                 >
-                <button @click="login">Unlock</button>
+                <p v-if="loginError" class="form-error">{{ loginError }}</p>
+                <button :disabled="isLoggingIn" @click="login">
+                    {{ isLoggingIn ? 'Unlocking…' : 'Unlock' }}
+                </button>
+                <button
+                    v-if="hasCachedNotes"
+                    class="offline-login-btn"
+                    @click="continueOffline"
+                >
+                    Continue offline
+                </button>
             </div>
         </div>
 
-        <!-- Application layout -->
         <div
             v-else
             id="app-layout"
             :class="{ 'mobile-note-open': isMobileNoteOpen }"
         >
-            <!-- Notes list -->
-            <div class="sidebar glass">
-                <div class="header">
-                    <h1>My Notes</h1>
+            <aside class="sidebar glass">
+                <div class="header app-header">
+                    <div>
+                        <h1>My Notes</h1>
+                        <span class="note-count">{{ filteredNotes.length }} notes</span>
+                    </div>
+                    <button class="icon-btn" title="Lock app" @click="logout">🔒</button>
                 </div>
+
+                <div v-if="isOffline" class="offline-banner">
+                    Offline — changes will sync later
+                </div>
+
                 <button class="new-btn" @click="createNewNote">
                     + Create New Note
                 </button>
+
+                <div class="search-wrap">
+                    <span>⌕</span>
+                    <input
+                        ref="searchInput"
+                        v-model="searchQuery"
+                        type="search"
+                        placeholder="Search notes… (⌘K)"
+                    >
+                </div>
+
+                <div class="filter-row">
+                    <select v-model="folderFilter" aria-label="Filter by folder">
+                        <option value="">All folders</option>
+                        <option v-for="folder in folders" :key="folder" :value="folder">
+                            {{ folder }}
+                        </option>
+                    </select>
+                    <button
+                        class="filter-toggle"
+                        :class="{ active: favoritesOnly }"
+                        title="Show favorites only"
+                        @click="favoritesOnly = !favoritesOnly"
+                    >
+                        ★
+                    </button>
+                </div>
+
+                <div v-if="allTags.length" class="tag-filter-list">
+                    <button
+                        v-for="tag in allTags"
+                        :key="tag"
+                        class="tag-chip"
+                        :class="{ active: selectedTag === tag }"
+                        @click="selectedTag = selectedTag === tag ? '' : tag"
+                    >
+                        #{{ tag }}
+                    </button>
+                </div>
+
                 <div class="note-list">
                     <div
-                        v-for="note in notes"
+                        v-for="note in filteredNotes"
                         :key="note.id"
                         class="course-item"
                         :class="{ active: currentNote && currentNote.id === note.id }"
                         @click="selectNote(note)"
                     >
-                        <div class="title">
-                            {{ note.title || 'Untitled Note' }}
+                        <div class="note-card-heading">
+                            <div class="title">{{ note.title || 'Untitled Note' }}</div>
+                            <div class="note-card-actions">
+                                <button
+                                    :class="{ active: note.pinned }"
+                                    title="Pin note"
+                                    @click.stop="toggleNoteFlag(note, 'pinned')"
+                                >⌖</button>
+                                <button
+                                    :class="{ active: note.favorite }"
+                                    title="Favorite note"
+                                    @click.stop="toggleNoteFlag(note, 'favorite')"
+                                >★</button>
+                            </div>
                         </div>
-                        <div class="preview-text">
-                            {{ getPreviewText(note.content) }}
+                        <div class="preview-text">{{ getPreviewText(note.content) }}</div>
+                        <div class="note-card-meta">
+                            <span>{{ note.folder || 'Notes' }}</span>
+                            <span>{{ formatRelativeDate(note.updated_at) }}</span>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- Note editor -->
-            <div v-if="currentNote" class="main-content glass">
-                <button class="mobile-back-btn" @click="closeMobileNote">
-                    ← Back to Notes
-                </button>
+                    <div v-if="!filteredNotes.length" class="no-results">
+                        No matching notes
+                    </div>
+                </div>
+
+                <div class="sidebar-footer">
+                    <button @click="exportAllNotes">Export JSON</button>
+                    <button @click="openImportPicker">Import</button>
+                    <input
+                        ref="importInput"
+                        class="visually-hidden"
+                        type="file"
+                        accept=".json,application/json"
+                        @change="importNotes"
+                    >
+                </div>
+            </aside>
+
+            <main v-if="currentNote" class="main-content glass">
+                <div class="mobile-editor-header">
+                    <button class="mobile-back-btn" @click="closeMobileNote">
+                        ← Back to Notes
+                    </button>
+                    <span class="save-status" :class="saveState">
+                        {{ saveStatusText }}
+                    </span>
+                </div>
+
                 <input
                     class="title-input"
                     v-model="currentNote.title"
@@ -75,17 +168,52 @@
                     @input="saveNote"
                 >
 
+                <div class="note-properties">
+                    <label>
+                        <span>Folder</span>
+                        <input
+                            v-model="currentNote.folder"
+                            list="folder-options"
+                            placeholder="Notes"
+                            @input="saveNote"
+                        >
+                        <datalist id="folder-options">
+                            <option v-for="folder in folders" :key="folder" :value="folder"></option>
+                        </datalist>
+                    </label>
+                    <label class="tags-property">
+                        <span>Tags</span>
+                        <input
+                            :value="tagText"
+                            placeholder="ideas, work, learning"
+                            @input="updateTags($event.target.value)"
+                        >
+                    </label>
+                </div>
+
                 <div class="controls">
-                    <button
-                        class="btn btn-edit"
-                        @click="isEditing = !isEditing"
-                    >
-                        {{ isEditing ? '👁️ View Beautiful Version' : '✏️ Edit Markdown' }}
+                    <button class="btn btn-edit" @click="isEditing = !isEditing">
+                        {{ isEditing ? '👁️ Preview' : '✏️ Edit' }}
                     </button>
                     <button
-                        class="btn btn-delete"
-                        @click="deleteNote(currentNote.id)"
+                        class="btn btn-secondary"
+                        :class="{ active: currentNote.pinned }"
+                        @click="toggleNoteFlag(currentNote, 'pinned')"
                     >
+                        {{ currentNote.pinned ? 'Unpin' : 'Pin' }}
+                    </button>
+                    <button
+                        class="btn btn-secondary"
+                        :class="{ active: currentNote.favorite }"
+                        @click="toggleNoteFlag(currentNote, 'favorite')"
+                    >
+                        {{ currentNote.favorite ? '★ Favorite' : '☆ Favorite' }}
+                    </button>
+                    <button class="btn btn-secondary" @click="showHistory">History</button>
+                    <button class="btn btn-secondary" @click="exportCurrentNote">
+                        Export .md
+                    </button>
+                    <button class="btn btn-delete" @click="deleteNote(currentNote.id)">
                         Delete
                     </button>
                 </div>
@@ -104,13 +232,45 @@
                         v-html="renderedMarkdown"
                     ></div>
                 </div>
-            </div>
+            </main>
 
-            <!-- Desktop empty state -->
-            <div v-else class="main-content glass empty-state">
+            <main v-else class="main-content glass empty-state">
+                <div class="empty-icon">✦</div>
                 <h2>Select or create a note to start</h2>
-            </div>
+                <p>Press <kbd>⌘</kbd> + <kbd>N</kbd> to create a note.</p>
+            </main>
         </div>
+
+        <div v-if="historyOpen" class="modal-backdrop" @click.self="historyOpen = false">
+            <section class="modal glass" role="dialog" aria-modal="true" aria-label="Note history">
+                <div class="modal-header">
+                    <div>
+                        <h2>Version history</h2>
+                        <p>{{ currentNote && currentNote.title }}</p>
+                    </div>
+                    <button class="icon-btn" @click="historyOpen = false">✕</button>
+                </div>
+
+                <div v-if="historyLoading" class="modal-message">Loading history…</div>
+                <div v-else-if="!historyVersions.length" class="modal-message">
+                    No earlier versions yet.
+                </div>
+                <div v-else class="history-list">
+                    <article v-for="version in historyVersions" :key="version.id">
+                        <div>
+                            <strong>{{ version.title || 'Untitled Note' }}</strong>
+                            <time>{{ formatDate(version.created_at) }}</time>
+                            <p>{{ getPreviewText(version.content) }}</p>
+                        </div>
+                        <button class="btn btn-secondary" @click="restoreVersion(version.id)">
+                            Restore
+                        </button>
+                    </article>
+                </div>
+            </section>
+        </div>
+
+        <div v-if="toastMessage" class="toast">{{ toastMessage }}</div>
     </div>
 </body>
 </html>
