@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Premium Notes</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+    <title>My Notes — Private Writing Space</title>
+    <meta name="theme-color" content="#050505">
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -12,25 +12,27 @@
     <script src="app.js" defer></script>
 </head>
 <body>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
+    <div class="ambient-light ambient-light-left"></div>
+    <div class="ambient-light ambient-light-right"></div>
+    <div class="noise-layer"></div>
 
     <div id="app" v-cloak>
         <div v-if="!isAuthenticated" class="login-screen">
             <div class="glass login-box">
-                <h1>🔒 Secure Notes</h1>
-                <p class="login-instruction">Enter your master password.</p>
+                <div class="brand-mark" aria-hidden="true">N</div>
+                <p class="eyebrow">PRIVATE WRITING SPACE</p>
+                <h1>My Notes</h1>
+                <p class="login-instruction">Your thoughts, kept quietly in one place.</p>
                 <input
                     type="password"
                     v-model="passwordInput"
-                    placeholder="Password"
+                    placeholder="Master password"
                     autocomplete="current-password"
                     @keyup.enter="login"
                 >
                 <p v-if="loginError" class="form-error">{{ loginError }}</p>
                 <button :disabled="isLoggingIn" @click="login">
-                    {{ isLoggingIn ? 'Unlocking…' : 'Unlock' }}
+                    {{ isLoggingIn ? 'Unlocking…' : 'Enter workspace' }}
                 </button>
                 <button
                     v-if="hasCachedNotes"
@@ -49,11 +51,14 @@
         >
             <aside class="sidebar glass">
                 <div class="header app-header">
-                    <div>
-                        <h1>My Notes</h1>
-                        <span class="note-count">{{ filteredNotes.length }} notes</span>
+                    <div class="app-brand">
+                        <div class="brand-mark brand-mark-small" aria-hidden="true">N</div>
+                        <div>
+                            <p class="eyebrow">PRIVATE WORKSPACE</p>
+                            <h1>My Notes</h1>
+                        </div>
                     </div>
-                    <button class="icon-btn" title="Lock app" @click="logout">🔒</button>
+                    <button class="icon-btn lock-btn" title="Lock app" aria-label="Lock app" @click="logout">◌</button>
                 </div>
 
                 <div v-if="isOffline" class="offline-banner">
@@ -61,11 +66,11 @@
                 </div>
 
                 <button class="new-btn" @click="createNewNote">
-                    + Create New Note
+                    <span aria-hidden="true">＋</span> New note
                 </button>
 
                 <div class="search-wrap">
-                    <span>⌕</span>
+                    <span aria-hidden="true">⌕</span>
                     <input
                         ref="searchInput"
                         v-model="searchQuery"
@@ -87,6 +92,7 @@
                         class="filter-toggle"
                         :class="{ active: favoritesOnly }"
                         title="Show favorites only"
+                        aria-label="Show favorites only"
                         @click="favoritesOnly = !favoritesOnly"
                     >
                         ★
@@ -106,6 +112,10 @@
                 </div>
 
                 <div class="note-list">
+                    <div class="list-heading">
+                        <span>{{ folderFilter || selectedTag || (favoritesOnly ? 'Favorites' : 'All notes') }}</span>
+                        <span>{{ filteredNotes.length }}</span>
+                    </div>
                     <div
                         v-for="note in filteredNotes"
                         :key="note.id"
@@ -119,11 +129,13 @@
                                 <button
                                     :class="{ active: note.pinned }"
                                     title="Pin note"
+                                    aria-label="Pin note"
                                     @click.stop="toggleNoteFlag(note, 'pinned')"
                                 >⌖</button>
                                 <button
                                     :class="{ active: note.favorite }"
                                     title="Favorite note"
+                                    aria-label="Favorite note"
                                     @click.stop="toggleNoteFlag(note, 'favorite')"
                                 >★</button>
                             </div>
@@ -156,7 +168,7 @@
             <main v-if="currentNote" class="main-content glass">
                 <div class="mobile-editor-header">
                     <button class="mobile-back-btn" @click="closeMobileNote">
-                        ← Back to Notes
+                        ← Notes
                     </button>
                     <span class="save-status" :class="saveState">
                         {{ saveStatusText }}
@@ -166,7 +178,7 @@
                 <input
                     class="title-input"
                     v-model="currentNote.title"
-                    placeholder="Note Title..."
+                    placeholder="Note title…"
                     @input="saveNote"
                 >
 
@@ -195,7 +207,7 @@
 
                 <div class="controls">
                     <button class="btn btn-edit" @click="isEditing = !isEditing">
-                        {{ isEditing ? '👁️ Preview' : '✏️ Edit' }}
+                        {{ isEditing ? 'Preview' : 'Edit' }}
                     </button>
                     <button
                         class="btn btn-secondary"
@@ -238,8 +250,9 @@
 
             <main v-else class="main-content glass empty-state">
                 <div class="empty-icon">✦</div>
-                <h2>Select or create a note to start</h2>
-                <p>Press <kbd>⌘</kbd> + <kbd>N</kbd> to create a note.</p>
+                <p class="eyebrow">YOUR SPACE IS READY</p>
+                <h2>Choose a thought to continue.</h2>
+                <p>Select a note or press <kbd>⌘</kbd> + <kbd>N</kbd> to begin.</p>
             </main>
         </div>
 
@@ -250,7 +263,7 @@
                         <h2>Version history</h2>
                         <p>{{ currentNote && currentNote.title }}</p>
                     </div>
-                    <button class="icon-btn" @click="historyOpen = false">✕</button>
+                    <button class="icon-btn" aria-label="Close version history" @click="historyOpen = false">✕</button>
                 </div>
 
                 <div v-if="historyLoading" class="modal-message">Loading history…</div>
