@@ -77,13 +77,20 @@ const normalizeTags = (tags) => {
   return [...new Set(values.map((tag) => String(tag).trim()).filter(Boolean))].slice(0, 20);
 };
 
+const normalizeSortOrder = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? Math.trunc(numericValue) : 0;
+};
+
 const normalizeNote = (body = {}) => ({
   title: String(body.title || 'Untitled Note').slice(0, 300),
   content: String(body.content || ''),
+  contentFormat: body.content_format === 'html' ? 'html' : 'markdown',
   folder: String(body.folder || 'Notes').trim().slice(0, 100) || 'Notes',
   tags: normalizeTags(body.tags),
   pinned: Boolean(body.pinned),
-  favorite: Boolean(body.favorite)
+  favorite: Boolean(body.favorite),
+  sortOrder: normalizeSortOrder(body.sort_order)
 });
 
 async function initDB() {
@@ -99,6 +106,8 @@ async function initDB() {
     await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'`;
     await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`;
     await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS content_format TEXT DEFAULT 'markdown'`;
+    await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS sort_order BIGINT DEFAULT 0`;
     await sql`ALTER TABLE notes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`;
     await sql`
       CREATE TABLE IF NOT EXISTS note_versions (
@@ -110,15 +119,25 @@ async function initDB() {
         tags TEXT[],
         pinned BOOLEAN,
         favorite BOOLEAN,
+        content_format TEXT DEFAULT 'markdown',
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
+    `;
+    await sql`
+      ALTER TABLE note_versions
+      ADD COLUMN IF NOT EXISTS content_format TEXT DEFAULT 'markdown'
     `;
   } catch (error) {
     console.error('DB initialization failed:', error);
   }
 }
 
-initDB();
+const databaseReady = initDB();
+
+app.use(['/api/notes', '/api/import'], asyncRoute(async (req, res, next) => {
+  await databaseReady;
+  next();
+}));
 
 app.post('/api/login', asyncRoute(async (req, res) => {
   const ip = req.ip || 'unknown';
@@ -156,9 +175,11 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/notes', requireAuth, asyncRoute(async (req, res) => {
   const { rows } = await sql`
-    SELECT id, title, content, folder, tags, pinned, favorite, updated_at
+    SELECT
+      id, title, content, content_format, folder, tags, pinned, favorite,
+      sort_order, updated_at
     FROM notes
-    ORDER BY pinned DESC, updated_at DESC, id DESC
+    ORDER BY pinned DESC, sort_order ASC, updated_at DESC, id DESC
   `;
   res.json(rows);
 }));
@@ -166,25 +187,55 @@ app.get('/api/notes', requireAuth, asyncRoute(async (req, res) => {
 app.post('/api/notes', requireAuth, asyncRoute(async (req, res) => {
   const note = normalizeNote(req.body);
   const { rows } = await sql`
-    INSERT INTO notes (title, content, folder, tags, pinned, favorite, updated_at)
+    INSERT INTO notes (
+      title, content, content_format, folder, tags, pinned, favorite,
+      sort_order, updated_at
+    )
     VALUES (
       ${note.title},
       ${note.content},
+      ${note.contentFormat},
       ${note.folder},
       ${note.tags},
       ${note.pinned},
       ${note.favorite},
+      ${note.sortOrder},
       NOW()
     )
-    RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+    RETURNING
+      id, title, content, content_format, folder, tags, pinned, favorite,
+      sort_order, updated_at
   `;
   res.status(201).json(rows[0]);
+}));
+
+app.post('/api/notes/reorder', requireAuth, asyncRoute(async (req, res) => {
+  const orderedIds = [...new Set(
+    (Array.isArray(req.body.orderedIds) ? req.body.orderedIds : [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )].slice(0, 1000);
+
+  if (!orderedIds.length) {
+    return res.status(400).json({ error: 'No note order supplied' });
+  }
+
+  const { rowCount } = await sql`
+    UPDATE notes
+    SET sort_order = positions.sort_order
+    FROM unnest(${orderedIds}::bigint[]) WITH ORDINALITY
+      AS positions(id, sort_order)
+    WHERE notes.id = positions.id
+  `;
+  return res.json({ reordered: rowCount });
 }));
 
 app.put('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
   const note = normalizeNote(req.body);
   const { rows: existingRows } = await sql`
-    SELECT id, title, content, folder, tags, pinned, favorite
+    SELECT
+      id, title, content, content_format, folder, tags, pinned, favorite,
+      sort_order
     FROM notes
     WHERE id = ${req.params.id}
   `;
@@ -195,6 +246,7 @@ app.put('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
 
   const changed = existing.title !== note.title
     || existing.content !== note.content
+    || existing.content_format !== note.contentFormat
     || existing.folder !== note.folder
     || JSON.stringify(existing.tags || []) !== JSON.stringify(note.tags)
     || existing.pinned !== note.pinned
@@ -203,12 +255,13 @@ app.put('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
   if (changed) {
     await sql`
       INSERT INTO note_versions (
-        note_id, title, content, folder, tags, pinned, favorite
+        note_id, title, content, content_format, folder, tags, pinned, favorite
       )
       VALUES (
         ${existing.id},
         ${existing.title},
         ${existing.content},
+        ${existing.content_format},
         ${existing.folder},
         ${existing.tags || []},
         ${existing.pinned},
@@ -222,13 +275,17 @@ app.put('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
     SET
       title = ${note.title},
       content = ${note.content},
+      content_format = ${note.contentFormat},
       folder = ${note.folder},
       tags = ${note.tags},
       pinned = ${note.pinned},
       favorite = ${note.favorite},
+      sort_order = ${note.sortOrder},
       updated_at = NOW()
     WHERE id = ${req.params.id}
-    RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+    RETURNING
+      id, title, content, content_format, folder, tags, pinned, favorite,
+      sort_order, updated_at
   `;
   return res.json(rows[0]);
 }));
@@ -243,7 +300,9 @@ app.delete('/api/notes/:id', requireAuth, asyncRoute(async (req, res) => {
 
 app.get('/api/notes/:id/history', requireAuth, asyncRoute(async (req, res) => {
   const { rows } = await sql`
-    SELECT id, note_id, title, content, folder, tags, pinned, favorite, created_at
+    SELECT
+      id, note_id, title, content, content_format, folder, tags, pinned,
+      favorite, created_at
     FROM note_versions
     WHERE note_id = ${req.params.id}
     ORDER BY created_at DESC
@@ -254,7 +313,7 @@ app.get('/api/notes/:id/history', requireAuth, asyncRoute(async (req, res) => {
 
 app.post('/api/notes/:id/history/:versionId/restore', requireAuth, asyncRoute(async (req, res) => {
   const { rows } = await sql`
-    SELECT title, content, folder, tags, pinned, favorite
+    SELECT title, content, content_format, folder, tags, pinned, favorite
     FROM note_versions
     WHERE id = ${req.params.versionId} AND note_id = ${req.params.id}
   `;
@@ -263,7 +322,7 @@ app.post('/api/notes/:id/history/:versionId/restore', requireAuth, asyncRoute(as
   }
 
   const current = await sql`
-    SELECT title, content, folder, tags, pinned, favorite
+    SELECT title, content, content_format, folder, tags, pinned, favorite
     FROM notes
     WHERE id = ${req.params.id}
   `;
@@ -273,11 +332,14 @@ app.post('/api/notes/:id/history/:versionId/restore', requireAuth, asyncRoute(as
 
   const old = current.rows[0];
   await sql`
-    INSERT INTO note_versions (note_id, title, content, folder, tags, pinned, favorite)
+    INSERT INTO note_versions (
+      note_id, title, content, content_format, folder, tags, pinned, favorite
+    )
     VALUES (
       ${req.params.id},
       ${old.title},
       ${old.content},
+      ${old.content_format},
       ${old.folder},
       ${old.tags || []},
       ${old.pinned},
@@ -291,13 +353,16 @@ app.post('/api/notes/:id/history/:versionId/restore', requireAuth, asyncRoute(as
     SET
       title = ${version.title},
       content = ${version.content},
+      content_format = ${version.content_format},
       folder = ${version.folder},
       tags = ${version.tags || []},
       pinned = ${version.pinned},
       favorite = ${version.favorite},
       updated_at = NOW()
     WHERE id = ${req.params.id}
-    RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+    RETURNING
+      id, title, content, content_format, folder, tags, pinned, favorite,
+      sort_order, updated_at
   `;
   return res.json(restored.rows[0]);
 }));
@@ -309,20 +374,27 @@ app.post('/api/import', requireAuth, asyncRoute(async (req, res) => {
   }
 
   const created = [];
-  for (const input of importedNotes) {
+  for (const [index, input] of importedNotes.entries()) {
     const note = normalizeNote(input);
     const { rows } = await sql`
-      INSERT INTO notes (title, content, folder, tags, pinned, favorite, updated_at)
+      INSERT INTO notes (
+        title, content, content_format, folder, tags, pinned, favorite,
+        sort_order, updated_at
+      )
       VALUES (
         ${note.title},
         ${note.content},
+        ${note.contentFormat},
         ${note.folder},
         ${note.tags},
         ${note.pinned},
         ${note.favorite},
+        ${normalizeSortOrder(input.sort_order ?? index)},
         NOW()
       )
-      RETURNING id, title, content, folder, tags, pinned, favorite, updated_at
+      RETURNING
+        id, title, content, content_format, folder, tags, pinned, favorite,
+        sort_order, updated_at
     `;
     created.push(rows[0]);
   }

@@ -1,12 +1,14 @@
 # My Notes
 
-A private Markdown note app built with Express, Vue, and Vercel Postgres.
+A private rich-text note app built with Express, Vue, and Vercel Postgres.
 
 ## Features
 
 - Full-text search across titles, content, folders, and tags
-- Folders, tags, pinned notes, and favorites
-- Markdown editing with a sanitized preview
+- Folders, tags, pinned notes, favorites, and saved drag-and-drop ordering
+- Rich-text editing with font, size, heading, emphasis, list, and link controls
+- Automatic rich formatting when Markdown is pasted
+- One-time conversion of existing Markdown notes when they are opened
 - Autosave status and version history with restore
 - Markdown export plus JSON backup and import
 - Keyboard shortcuts

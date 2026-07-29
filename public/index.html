@@ -134,20 +134,44 @@
                 <div class="note-list">
                     <div class="list-heading">
                         <span>{{ folderFilter || selectedTag || (favoritesOnly ? 'Favorites' : 'All notes') }}</span>
-                        <span>{{ filteredNotes.length }}</span>
+                        <span>{{ filteredNotes.length }} · drag to order</span>
                     </div>
                     <div
                         v-for="note in filteredNotes"
                         :key="note.id"
                         class="course-item"
-                        :class="{ active: currentNote && currentNote.id === note.id }"
+                        :class="{
+                            active: currentNote && currentNote.id === note.id,
+                            dragging: draggedNoteId === note.id,
+                            'drop-before': dropTargetId === note.id && dropPosition === 'before',
+                            'drop-after': dropTargetId === note.id && dropPosition === 'after'
+                        }"
+                        :data-note-id="note.id"
+                        draggable="true"
                         role="button"
                         tabindex="0"
                         @click="selectNote(note)"
                         @keydown.enter.prevent="selectNote(note)"
                         @keydown.space.prevent="selectNote(note)"
+                        @dragstart="beginDrag(note, $event)"
+                        @dragover.prevent="dragOverNote(note, $event)"
+                        @drop.prevent="dropNote(note)"
+                        @dragend="endDrag"
                     >
                         <div class="note-card-heading">
+                            <span
+                                class="drag-handle"
+                                role="button"
+                                tabindex="0"
+                                :aria-label="`Reorder ${note.title || 'Untitled Note'}. Use arrow keys or drag.`"
+                                title="Drag to reorder"
+                                @click.stop.prevent
+                                @pointerdown.stop="beginTouchReorder(note, $event)"
+                                @keydown.up="reorderWithKeyboard(note, -1, $event)"
+                                @keydown.down="reorderWithKeyboard(note, 1, $event)"
+                            >
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                            </span>
                             <div class="title">{{ note.title || 'Untitled Note' }}</div>
                             <div class="note-card-actions">
                                 <button
@@ -171,7 +195,9 @@
                                 >{{ note.favorite ? '★' : '☆' }}</button>
                             </div>
                         </div>
-                        <div class="preview-text">{{ getPreviewText(note.content) }}</div>
+                        <div class="preview-text">
+                            {{ getPreviewText(note.content, note.content_format) }}
+                        </div>
                         <div class="note-card-meta">
                             <span>{{ note.folder || 'Notes' }}</span>
                             <span>{{ formatRelativeDate(note.updated_at) }}</span>
@@ -236,10 +262,138 @@
                     </label>
                 </div>
 
+                <div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+                    <select
+                        v-model="selectedBlock"
+                        class="toolbar-select toolbar-block-select"
+                        aria-label="Paragraph style"
+                        title="Paragraph style"
+                        @mousedown="rememberSelection"
+                        @change="applyBlock"
+                    >
+                        <option value="p">Paragraph</option>
+                        <option value="h1">Heading 1</option>
+                        <option value="h2">Heading 2</option>
+                        <option value="h3">Heading 3</option>
+                        <option value="blockquote">Quote</option>
+                    </select>
+
+                    <select
+                        v-model="selectedFont"
+                        class="toolbar-select toolbar-font-select"
+                        aria-label="Font family"
+                        title="Font family"
+                        @mousedown="rememberSelection"
+                        @change="applyFont"
+                    >
+                        <option value="" disabled>Font</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Trebuchet MS">Trebuchet</option>
+                        <option value="Courier New">Courier</option>
+                    </select>
+
+                    <select
+                        v-model="selectedFontSize"
+                        class="toolbar-select toolbar-size-select"
+                        aria-label="Font size"
+                        title="Font size"
+                        @mousedown="rememberSelection"
+                        @change="applyFontSize"
+                    >
+                        <option value="" disabled>Size</option>
+                        <option value="2">Small</option>
+                        <option value="3">Normal</option>
+                        <option value="4">Medium</option>
+                        <option value="5">Large</option>
+                        <option value="6">Huge</option>
+                    </select>
+
+                    <span class="toolbar-divider" aria-hidden="true"></span>
+
+                    <button
+                        :class="{ active: activeFormats.bold }"
+                        :aria-pressed="activeFormats.bold"
+                        title="Bold (⌘B)"
+                        aria-label="Bold"
+                        @mousedown.prevent
+                        @click="runEditorCommand('bold')"
+                    ><strong>B</strong></button>
+                    <button
+                        :class="{ active: activeFormats.italic }"
+                        :aria-pressed="activeFormats.italic"
+                        title="Italic (⌘I)"
+                        aria-label="Italic"
+                        @mousedown.prevent
+                        @click="runEditorCommand('italic')"
+                    ><em>I</em></button>
+                    <button
+                        :class="{ active: activeFormats.underline }"
+                        :aria-pressed="activeFormats.underline"
+                        title="Underline (⌘U)"
+                        aria-label="Underline"
+                        @mousedown.prevent
+                        @click="runEditorCommand('underline')"
+                    ><u>U</u></button>
+                    <button
+                        :class="{ active: activeFormats.strikeThrough }"
+                        :aria-pressed="activeFormats.strikeThrough"
+                        title="Strikethrough"
+                        aria-label="Strikethrough"
+                        @mousedown.prevent
+                        @click="runEditorCommand('strikeThrough')"
+                    ><s>S</s></button>
+
+                    <span class="toolbar-divider" aria-hidden="true"></span>
+
+                    <button
+                        :class="{ active: activeFormats.insertUnorderedList }"
+                        :aria-pressed="activeFormats.insertUnorderedList"
+                        title="Bulleted list"
+                        aria-label="Bulleted list"
+                        @mousedown.prevent
+                        @click="runEditorCommand('insertUnorderedList')"
+                    >• List</button>
+                    <button
+                        :class="{ active: activeFormats.insertOrderedList }"
+                        :aria-pressed="activeFormats.insertOrderedList"
+                        title="Numbered list"
+                        aria-label="Numbered list"
+                        @mousedown.prevent
+                        @click="runEditorCommand('insertOrderedList')"
+                    >1. List</button>
+                    <button
+                        title="Add link"
+                        aria-label="Add link"
+                        @mousedown.prevent
+                        @click="addLink"
+                    >Link</button>
+
+                    <span class="toolbar-divider" aria-hidden="true"></span>
+
+                    <button
+                        title="Undo"
+                        aria-label="Undo"
+                        @mousedown.prevent
+                        @click="runEditorCommand('undo')"
+                    >↶</button>
+                    <button
+                        title="Redo"
+                        aria-label="Redo"
+                        @mousedown.prevent
+                        @click="runEditorCommand('redo')"
+                    >↷</button>
+                    <button
+                        title="Clear formatting"
+                        aria-label="Clear formatting"
+                        @mousedown.prevent
+                        @click="clearFormatting"
+                    >Clear</button>
+
+                    <span class="toolbar-hint">Markdown paste formats itself</span>
+                </div>
+
                 <div class="controls">
-                    <button class="btn btn-edit" @click="isEditing = !isEditing">
-                        {{ isEditing ? 'Preview' : 'Edit' }}
-                    </button>
                     <button
                         class="btn btn-secondary"
                         :class="{ active: currentNote.pinned }"
@@ -264,17 +418,21 @@
                 </div>
 
                 <div class="workspace">
-                    <textarea
-                        v-if="isEditing"
-                        class="editor-pane"
-                        v-model="currentNote.content"
-                        placeholder="Type your markdown here..."
-                        @input="saveNote"
-                    ></textarea>
                     <div
-                        v-else
-                        class="preview-pane"
-                        v-html="renderedMarkdown"
+                        ref="editor"
+                        class="rich-editor"
+                        contenteditable="true"
+                        role="textbox"
+                        aria-multiline="true"
+                        aria-label="Note content"
+                        data-placeholder="Start writing…"
+                        spellcheck="true"
+                        autocapitalize="sentences"
+                        @input="handleEditorInput"
+                        @paste="handleEditorPaste"
+                        @drop="handleEditorDrop"
+                        @keyup="rememberSelection"
+                        @mouseup="rememberSelection"
                     ></div>
                 </div>
             </main>
@@ -306,7 +464,9 @@
                         <div>
                             <strong>{{ version.title || 'Untitled Note' }}</strong>
                             <time>{{ formatDate(version.created_at) }}</time>
-                            <p>{{ getPreviewText(version.content) }}</p>
+                            <p>
+                                {{ getPreviewText(version.content, version.content_format) }}
+                            </p>
                         </div>
                         <button class="btn btn-secondary" @click="restoreVersion(version.id)">
                             Restore
