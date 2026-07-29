@@ -20,6 +20,8 @@
     font-family: 'Inter', sans-serif;
 }
 
+[v-cloak] { display: none; }
+
 body {
     background-color: var(--bg-color);
     color: var(--text-main);
@@ -137,6 +139,29 @@ body {
 
 .login-box button:hover { background: #2563eb; }
 
+.login-box button:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.login-box .offline-login-btn {
+    margin-top: 0.75rem;
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+}
+
+.login-box .offline-login-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+}
+
+.form-error {
+    color: #fca5a5;
+    font-size: 0.85rem;
+    margin: -0.3rem 0 0.8rem;
+}
+
 /* Desktop Layout */
 #app-layout {
     display: flex;
@@ -148,7 +173,7 @@ body {
 }
 
 .sidebar {
-    width: 320px;
+    width: 350px;
     display: flex;
     flex-direction: column;
     padding: 1.5rem;
@@ -163,6 +188,48 @@ body {
     color: #fff;
 }
 
+.app-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.note-count {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.icon-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.offline-banner {
+    padding: 0.6rem 0.75rem;
+    margin: -0.5rem 0 1rem;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+    font-size: 0.78rem;
+    text-align: center;
+}
+
 .new-btn {
     background: rgba(230, 57, 70, 0.15);
     border: 1px solid var(--accent);
@@ -173,7 +240,95 @@ body {
     cursor: pointer;
     transition: all 0.3s;
     width: 100%;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.22);
+    color: var(--text-muted);
+}
+
+.search-wrap:focus-within {
+    border-color: var(--accent-secondary);
+}
+
+.search-wrap input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-main);
+}
+
+.filter-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.filter-row select,
+.note-properties input {
+    min-width: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: 7px;
+    outline: none;
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text-main);
+}
+
+.filter-row select {
+    flex: 1;
+    padding: 0.55rem 0.65rem;
+}
+
+.filter-toggle {
+    width: 38px;
+    border: 1px solid var(--glass-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.filter-toggle.active,
+.filter-toggle:hover {
+    border-color: #f59e0b;
+    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.12);
+}
+
+.tag-filter-list {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.15rem;
+    overflow-x: auto;
+}
+
+.tag-chip {
+    flex: 0 0 auto;
+    padding: 0.32rem 0.55rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+
+.tag-chip.active,
+.tag-chip:hover {
+    border-color: var(--accent-secondary);
+    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.12);
 }
 
 .new-btn:hover {
@@ -222,12 +377,92 @@ body {
     text-overflow: ellipsis;
 }
 
+.note-card-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.note-card-heading .title {
+    flex: 1;
+    min-width: 0;
+}
+
+.note-card-actions {
+    display: flex;
+    gap: 0.15rem;
+}
+
+.note-card-actions button {
+    border: 0;
+    background: transparent;
+    color: #475569;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.note-card-actions button:hover,
+.note-card-actions button.active {
+    color: #fbbf24;
+}
+
 .course-item .preview-text {
     font-size: 0.85rem;
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.note-card-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+    color: #64748b;
+    font-size: 0.68rem;
+}
+
+.no-results {
+    padding: 2rem 0.5rem;
+    color: var(--text-muted);
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.sidebar-footer {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.sidebar-footer button {
+    flex: 1;
+    padding: 0.55rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.sidebar-footer button:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
 }
 
 /* Main Content Area */
@@ -246,6 +481,25 @@ body {
     opacity: 0.7;
 }
 
+.empty-state p {
+    margin-top: 0.75rem;
+    color: var(--text-muted);
+}
+
+.empty-icon {
+    margin-bottom: 0.8rem;
+    color: var(--accent-secondary);
+    font-size: 3rem;
+}
+
+kbd {
+    padding: 0.15rem 0.35rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.75rem;
+}
+
 .title-input {
     width: 100%;
     background: transparent;
@@ -254,9 +508,56 @@ body {
     font-size: 2rem;
     font-weight: 800;
     outline: none;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     border-bottom: 1px solid var(--glass-border);
     padding-bottom: 0.8rem;
+}
+
+.mobile-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 1.5rem;
+}
+
+.save-status {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
+.save-status.saving,
+.save-status.unsaved { color: #fbbf24; }
+.save-status.queued { color: #fb923c; }
+.save-status.error { color: #f87171; }
+.save-status.saved { color: #4ade80; }
+
+.note-properties {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.8rem;
+}
+
+.note-properties label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
+.note-properties label:first-child {
+    width: min(36%, 250px);
+}
+
+.note-properties .tags-property {
+    flex: 1;
+}
+
+.note-properties input {
+    width: 100%;
+    padding: 0.48rem 0.6rem;
+    font-size: 0.8rem;
 }
 
 /* Mobile Back Button */
@@ -277,6 +578,7 @@ body {
 
 .controls {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 1rem;
 }
@@ -296,6 +598,19 @@ body {
 }
 
 .btn-edit:hover { opacity: 0.8; }
+
+.btn-secondary {
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+}
+
+.btn-secondary:hover,
+.btn-secondary.active {
+    border-color: var(--accent-secondary);
+    color: var(--text-main);
+    background: rgba(59, 130, 246, 0.12);
+}
 
 .btn-delete {
     background: transparent;
@@ -415,6 +730,94 @@ body {
     margin-bottom: 1rem;
 }
 
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(2, 6, 23, 0.75);
+    backdrop-filter: blur(6px);
+}
+
+.modal {
+    width: min(620px, 100%);
+    max-height: min(700px, 85dvh);
+    padding: 1.5rem;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.modal-header h2 { font-size: 1.2rem; }
+
+.modal-header p {
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.modal-message {
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.history-list {
+    max-height: 60dvh;
+    overflow-y: auto;
+}
+
+.history-list article {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.history-list article > div {
+    min-width: 0;
+}
+
+.history-list time {
+    display: block;
+    margin: 0.25rem 0;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+
+.history-list p {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.toast {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 150;
+    max-width: min(380px, calc(100vw - 2.5rem));
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 9px;
+    background: #172033;
+    box-shadow: var(--glass-shadow);
+    color: var(--text-main);
+    font-size: 0.85rem;
+}
+
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -460,4 +863,51 @@ body {
 
     .mobile-back-btn { display: block; }
     .empty-state { display: none !important; }
+
+    .mobile-editor-header {
+        margin-bottom: 0.6rem;
+    }
+
+    .mobile-back-btn {
+        margin-bottom: 0;
+    }
+
+    .note-properties {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .note-properties label:first-child {
+        width: 100%;
+    }
+
+    .controls {
+        flex-wrap: nowrap;
+        padding-bottom: 0.3rem;
+        overflow-x: auto;
+    }
+
+    .controls .btn {
+        flex: 0 0 auto;
+    }
+}
+
+@media (max-width: 520px) {
+    .sidebar,
+    .main-content {
+        padding: 1rem;
+    }
+
+    .title-input {
+        font-size: 1.5rem;
+    }
+
+    .editor-pane,
+    .preview-pane {
+        padding: 1rem;
+    }
+
+    .modal {
+        padding: 1rem;
+    }
 }
